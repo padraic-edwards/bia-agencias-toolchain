@@ -24,9 +24,9 @@ services:
       private_repo: true
       has_issues: false
       enable_traceability: true
-      access_token: '{{form.github.parameters.access-token}}'
+      access_token: '{{form.githubconsolidated.parameters.access-token}}'
 form:
-  github:
+  githubconsolidated:
     parameters:
       access-token: '08fc0a3cabfdb2ad58451135fd9c394347c6b25b'
 
