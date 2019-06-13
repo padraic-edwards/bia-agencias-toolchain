@@ -14,7 +14,7 @@ toolchain:
   name: 'bia-agencias-toolchain-{{timestamp}}'
 services:
   orchestrator-repo:
-    service_id: github
+    service_id: githubconsolidated
     parameters:
       repo_name: 'QA Manager V2 repo'
       title:     'QA Manager V2 repo'
