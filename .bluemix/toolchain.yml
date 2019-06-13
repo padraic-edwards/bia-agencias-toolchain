@@ -1,0 +1,33 @@
+version: '2'
+messages:
+template:
+  name: "Deployment BIA Agencias"
+  description: "Implementa pipeline de DevOps da BIA Agencias"
+  required:
+    - github-orchestrator
+    - pipeline-orchestrator
+  info:
+    git url: >-
+      [https://github.com/marcosbv/bia-agencias-toolchain](https://github.com/marcosbv/bia-agencias-toolchain)
+    git branch: >-
+      [master](https://github.com/marcosbv/bia-agencias-toolchain/tree/master)
+toolchain:
+  name: 'bia-agencias-toolchain-{{timestamp}}'
+services:
+  orchestrator-repo:
+    service_id: githubcustom
+    parameters:
+      repo_name: 'QA Manager V2 repo'
+      title:     'QA Manager V2 repo'
+      repo_url:  'https://github.ibm.com/watson-delivery-la/qa-manager-2.git'
+      root_url:  'https://github.ibm.com'
+      type: link
+      private_repo: true
+      has_issues: false
+      enable_traceability: true
+      access_token: '{{form.github.parameters.access-token}}'
+form:
+  github:
+    parameters:
+      access-token: '08fc0a3cabfdb2ad58451135fd9c394347c6b25b'
+
