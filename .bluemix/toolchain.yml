@@ -27,6 +27,6 @@ services:
       access_token: '{{form.githubconsolidated.parameters.access-token}}'
 form:
   githubconsolidated:
-    parameters:
-      access-token: '08fc0a3cabfdb2ad58451135fd9c394347c6b25b'
+    schema:
+      $ref: github.json
 
