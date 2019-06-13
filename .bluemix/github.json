@@ -1,8 +1,5 @@
 {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "messages": {
-       "$i18n": "locales.yml"
-    },
     "title": "Informações sobre Github",
     "description": "Insira informações do Github",
     "longDescription": "Insira informações do Github" ,
