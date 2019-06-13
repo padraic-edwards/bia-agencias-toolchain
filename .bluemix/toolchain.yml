@@ -4,8 +4,7 @@ template:
   name: "Deployment BIA Agencias"
   description: "Implementa pipeline de DevOps da BIA Agencias"
   required:
-    - github-orchestrator
-    - pipeline-orchestrator
+    - orchestrator-repo
   info:
     git url: >-
       [https://github.com/marcosbv/bia-agencias-toolchain](https://github.com/marcosbv/bia-agencias-toolchain)
@@ -15,7 +14,7 @@ toolchain:
   name: 'bia-agencias-toolchain-{{timestamp}}'
 services:
   orchestrator-repo:
-    service_id: githubcustom
+    service_id: github
     parameters:
       repo_name: 'QA Manager V2 repo'
       title:     'QA Manager V2 repo'
