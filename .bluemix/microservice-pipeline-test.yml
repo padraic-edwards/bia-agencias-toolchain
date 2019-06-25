@@ -1,27 +1,79 @@
 ---
-defaultBaseImageVersion: 'latest'
+defaultBaseImageVersion: '1.0'
 properties:
 - name: MICROSERVICE_DIR
-  value: ${MICROSERVICE_NAME}
+  value: auth
   type: text
 - name: MICROSERVICE_NAME
-  value: qa-${MICROSERVICE_NAME}
+  value: qa-auth
   type: text
 - name: API_KEY
   type: secure
-  value: ${API_KEY}
 - name: buildProperties
   value: build.properties
   type: file
 - name: USE_ISTIO
-  value: ${USE_ISTIO}
+  value: virtualservice
   type: text
 - name: GATEWAY_ADDRESS
-  value: '${GATEWAY_ADDRESS}'
+  value: 169.47.197.170
   type: text
 stages:
+- name: PRE-BUILD
+  inputs:
+  - url: https://git.ng.bluemix.net/marcos.viera/qa-manager-microservices.git
+    type: git
+    branch: master
+    dir_name: null
+  triggers:
+  - type: git
+    events: '{"push":true,"pull_request":false,"pull_request_closed":false}'
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  properties:
+  - name: buildProperties
+    value: build.properties
+    type: file
+  jobs:
+  - name: BuildDeps
+    type: builder
+    curatedDockerImage: latest
+    artifact_dir: output
+    build_type: npm
+    script: |-
+      #!/bin/bash
+      # The default Node.js version is 0.10.40
+      # To use Node.js 0.10.48, uncomment the following line:
+      #export PATH=/opt/IBM/node-v0.10.48/bin:$PATH
+      # To use Node.js 0.12.7, uncomment the following line:
+      #export PATH=/opt/IBM/node-v0.12/bin:$PATH
+      # To use Node.js 4.4.5, uncomment the following line:
+      #export PATH=/opt/IBM/node-v4.4.5/bin:$PATH
+      # To use Node.js 6.7.0, uncomment the following line:
+      #export PATH=/opt/IBM/node-v6.7.0/bin:$PATH
+      npm install
+      npm run lint
+
+      mkdir -p $ARCHIVE_DIR
+      cp package.json $ARCHIVE_DIR
+      cp yarn.lock $ARCHIVE_DIR
+      cp -r $MICROSERVICE_DIR $ARCHIVE_DIR
+      cp -r _common $ARCHIVE_DIR
+
+      export MY_BUILD_NUMBER=$MICROSERVICE_NAME-v$BUILD_NUMBER
+      echo MY_BUILD_NUMBER=$MY_BUILD_NUMBER >> build.properties
+      echo GIT_COMMIT=$GIT_COMMIT >> build.properties
+      cp build.properties $ARCHIVE_DIR
+
+      ibmcloud plugin install -f doi
+      ibmcloud login --apikey $API_KEY --no-region
+      ibmcloud doi publishbuildrecord --logicalappname="$MICROSERVICE_NAME" --buildnumber="$MY_BUILD_NUMBER" --branch="$GIT_BRANCH" --repositoryurl="$GIT_URL" --commitid="$GIT_COMMIT" --status=pass
 - name: PRE-TEST
-  inputs: []
+  inputs:
+  - type: job
+    stage: PRE-BUILD
+    job: BuildDeps
+    dir_name: null
   triggers:
   - type: stage
   permission:
@@ -126,7 +178,8 @@ stages:
     image_name: qa-manager-auth
     target:
       region_id: ibm:yp:us-south
-      api_key: ${API_KEY}
+      api_key: cOX6JqlLb2v7wtOrheGTeI/nDjTWImRnewI10aJR41hWQUYDtEF80akQZivyXeGIQivgI3QCx+70jKTkn0K4zQ==
+      account_guid: 3e819260d4f340c0999240e909d61a08
 - name: DEPLOY-DEV
   inputs:
   - type: job
@@ -139,10 +192,10 @@ stages:
     execute: TOOLCHAIN_ADMINS
   properties:
   - name: REGIONS_TO_DEPLOY
-    value: ${REGIONS_TO_DEPLOY_DEV}
+    value: us-south
     type: text
   - name: REPLICAS
-    value: ${REPLICAS_DEV}
+    value: '1'
     type: text
   jobs:
   - name: VulnerabilityAdvisor
@@ -166,7 +219,8 @@ stages:
     image_tag: latest
     target:
       region_id: ibm:yp:us-south
-      api_key: ${API_KEY}
+      api_key: cOX6JqlLb2v7wtOrheGTeI/nDjTWImRnewI10aJR41hWQUYDtEF80akQZivyXeGIQivgI3QCx+70jKTkn0K4zQ==
+      account_guid: 3e819260d4f340c0999240e909d61a08
     test_type: vulnerabilityadvisor
   - name: DeployDev
     type: deployer
@@ -174,9 +228,10 @@ stages:
     deploy_type: kubernetes
     target:
       region_id: ibm:yp:us-south
-      api_key: ${API_KEY}
-      resource_group: ${RESOURCE_GROUP}
-      kubernetes_cluster: ${CLUSTER_NAME}_DEV
+      api_key: cOX6JqlLb2v7wtOrheGTeI/nDjTWImRnewI10aJR41hWQUYDtEF80akQZivyXeGIQivgI3QCx+70jKTkn0K4zQ==
+      account_guid: 3e819260d4f340c0999240e909d61a08
+      resource_group: Default
+      kubernetes_cluster: mycluster
     script: "#!/bin/bash\n#set -x\n\n# Use this script as a starting point to create\
       \ your own deployment.yml\n\n# Make sure the cluster is running and get the\
       \ ip_address\nip_addr=$(bx cs workers $PIPELINE_KUBERNETES_CLUSTER_NAME | grep\
@@ -221,6 +276,13 @@ stages:
       \n     # echo \"PORT=$port\"\n     # echo \"\"\n     #echo \"$NAME running at:\
       \ http://$ip_addr:$port\"\ndone\n\necho \"**************\"\necho \"Deploy done!\"\
       \n"
+  - name: IntegrationTest
+    type: tester
+    curatedDockerImage: latest
+    script: |-
+      #!/bin/bash
+      #Invoke tests here
+    test_type: simple
   - name: Checkpoint
     type: builder
     curatedDockerImage: latest
@@ -241,10 +303,10 @@ stages:
     execute: TOOLCHAIN_ADMINS
   properties:
   - name: REGIONS_TO_DEPLOY
-    value: ${REGIONS_TO_DEPLOY_HOM}
+    value: eu-de
     type: text
   - name: REPLICAS
-    value: ${REPLICAS_HOM}
+    value: '3'
     type: text
   jobs:
   - name: DeployHom
@@ -252,10 +314,11 @@ stages:
     curatedDockerImage: latest
     deploy_type: kubernetes
     target:
-      region_id: ibm:yp:us-south
-      api_key: ${API_KEY}
-      resource_group: ${RESOURCE_GROUP}
-      kubernetes_cluster: ${CLUSTER_NAME}_HOM
+      region_id: ibm:yp:au-syd
+      api_key: cOX6JqlLb2v7wtOrheGTeI/nDjTWImRnewI10aJR41hWQUYDtEF80akQZivyXeGIQivgI3QCx+70jKTkn0K4zQ==
+      account_guid: 3e819260d4f340c0999240e909d61a08
+      resource_group: DCD_Agencias_1
+      kubernetes_cluster: k8s-marcosbv
     script: "#!/bin/bash\nset -x\n\n# Use this script as a starting point to create\
       \ your own deployment.yml\n\n# Make sure the cluster is running and get the\
       \ ip_address\nip_addr=$(bx cs workers $PIPELINE_KUBERNETES_CLUSTER_NAME | grep\
@@ -308,22 +371,22 @@ stages:
     execute: TOOLCHAIN_ADMINS
   properties:
   - name: BENCHMARK_URL
-    value: ${BENCHMARK_URL}
+    value: http://www.google.com:80/
     type: text
   - name: WORKLOADS
-    value: ${PERF_TEST_WORKLOADS}
+    value: 100 500 1000
     type: text
   - name: CONCURRENT_USERS_RATIO
-    value: ${PERF_CONCURRENT_USERS_RATIO}
+    value: '10'
     type: text
   - name: PAYLOAD
-    value: '${PERF_PAYLOAD}'
+    value: '{}'
     type: text
   - name: METHOD
-    value: ${PERF_PAYLOAD}
+    value: GET
     type: text
   - name: BENCHMARK_API_KEY
-    type: ${PERF_API_KEY}
+    type: secure
   jobs:
   - name: PerformanceTest
     type: tester
@@ -360,16 +423,24 @@ stages:
     dir_name: null
   permission:
     execute: TOOLCHAIN_ADMINS
+  properties:
+  - name: REGIONS_TO_DEPLOY
+    value: eu-de
+    type: text
+  - name: REPLICAS
+    value: '3'
+    type: text
   jobs:
   - name: DeployProd
     type: deployer
     curatedDockerImage: latest
     deploy_type: kubernetes
     target:
-      region_id: ibm:yp:us-south
-      api_key: ${API_KEY}
-      resource_group: ${RESOURCE_GROUP}
-      kubernetes_cluster: ${CLUSTER_NAME}_PROD
+      region_id: ibm:yp:eu-de
+      api_key: cOX6JqlLb2v7wtOrheGTeI/nDjTWImRnewI10aJR41hWQUYDtEF80akQZivyXeGIQivgI3QCx+70jKTkn0K4zQ==
+      account_guid: 3e819260d4f340c0999240e909d61a08
+      resource_group: DCD_Agencias_1
+      kubernetes_cluster: MarcosVieira-kubernetes2
     script: "#!/bin/bash\nset -x\n\n# Use this script as a starting point to create\
       \ your own deployment.yml\n\n# Make sure the cluster is running and get the\
       \ ip_address\nip_addr=$(bx cs workers $PIPELINE_KUBERNETES_CLUSTER_NAME | grep\
@@ -415,3 +486,8 @@ stages:
       \n     # echo \"PUBLIC_IP=$ip_addr\"\n     # echo \"PORT=$port\"\n     # echo\
       \ \"\"\n     #echo \"$NAME running at: http://$ip_addr:$port\"\ndone\n\necho\
       \ \"**************\"\necho \"Deploy done!\"\n"
+hooks:
+- enabled: true
+  label: null
+  ssl_enabled: false
+  url: http://lms-api/v1/messaging/webhook/publish
