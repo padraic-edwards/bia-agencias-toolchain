@@ -27,18 +27,18 @@ services:
       has_issues: true
       enable_traceability: true
       access_token: '{{form.hostedgit.parameters.access-token}}'
-  dra:
-    service_id: draservicebroker
-    $ref: dra.yml
   qa-auth-build:
     service_id: pipeline
     parameters:
       name: qa-auth-pipeline
       ui-pipeline: true
+      services: 
+        - qa-repo
       configuration:
          content:
            $text: microservice-pipeline.yml
          env:
+            QA_REPO: qa-repo
             MICROSERVICE_NAME: auth
             API_KEY: '{{form.pipeline.parameters.api-key}}'
             CLUSTER_NAME: '{{form.pipeline.parameters.cluster-name}}'
@@ -57,6 +57,9 @@ services:
             PERF_PAYLOAD: '{}'
             PERF_API_KEY: ''
          execute: false
+  dra:
+    service_id: draservicebroker
+    $ref: dra.yml
 form:
   hostedgit:
     schema:

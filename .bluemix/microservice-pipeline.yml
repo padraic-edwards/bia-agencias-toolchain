@@ -22,7 +22,7 @@ properties:
 stages:
 - name: PRE-BUILD
   inputs:
-  - url: '{{form.hostedgit.parameters.repo-url}}'
+  - service: ${QA_REPO}
     type: git
     branch: master
     dir_name: null
