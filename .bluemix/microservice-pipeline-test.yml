@@ -1,0 +1,70 @@
+---
+defaultBaseImageVersion: 'latest'
+properties:
+- name: MICROSERVICE_DIR
+  value: ${MICROSERVICE_NAME}
+  type: text
+- name: MICROSERVICE_NAME
+  value: qa-${MICROSERVICE_NAME}
+  type: text
+- name: API_KEY
+  type: secure
+  value: ${API_KEY}
+- name: buildProperties
+  value: build.properties
+  type: file
+- name: USE_ISTIO
+  value: ${USE_ISTIO}
+  type: text
+- name: GATEWAY_ADDRESS
+  value: '${GATEWAY_ADDRESS}'
+  type: text
+stages:
+- name: PRE-BUILD
+  inputs:
+  - service: ${QA_REPO}
+    type: git
+    branch: master
+  triggers:
+  - type: git
+    events: '{"push":true,"pull_request":false,"pull_request_closed":false}'
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  properties:
+  - name: buildProperties
+    value: build.properties
+    type: file
+  jobs:
+  - name: BuildDeps
+    type: builder
+    curatedDockerImage: latest
+    artifact_dir: output
+    build_type: npm
+    script: |-
+      #!/bin/bash
+      # The default Node.js version is 0.10.40
+      # To use Node.js 0.10.48, uncomment the following line:
+      #export PATH=/opt/IBM/node-v0.10.48/bin:$PATH
+      # To use Node.js 0.12.7, uncomment the following line:
+      #export PATH=/opt/IBM/node-v0.12/bin:$PATH
+      # To use Node.js 4.4.5, uncomment the following line:
+      #export PATH=/opt/IBM/node-v4.4.5/bin:$PATH
+      # To use Node.js 6.7.0, uncomment the following line:
+      #export PATH=/opt/IBM/node-v6.7.0/bin:$PATH
+      npm install
+      npm run lint
+
+      mkdir -p $ARCHIVE_DIR
+      cp package.json $ARCHIVE_DIR
+      cp yarn.lock $ARCHIVE_DIR
+      cp -r $MICROSERVICE_DIR $ARCHIVE_DIR
+      cp -r _common $ARCHIVE_DIR
+
+      export MY_BUILD_NUMBER=$MICROSERVICE_NAME-v$BUILD_NUMBER
+      echo MY_BUILD_NUMBER=$MY_BUILD_NUMBER >> build.properties
+      echo GIT_COMMIT=$GIT_COMMIT >> build.properties
+      cp build.properties $ARCHIVE_DIR
+
+      ibmcloud plugin install -f doi
+      ibmcloud login --apikey $API_KEY --no-region
+      ibmcloud doi publishbuildrecord --logicalappname="$MICROSERVICE_NAME" --buildnumber="$MY_BUILD_NUMBER" --branch="$GIT_BRANCH" --repositoryurl="$GIT_URL" --commitid="$GIT_COMMIT" --status=pass
