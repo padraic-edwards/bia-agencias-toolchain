@@ -1,4 +1,5 @@
 parameters:
+  iam-api-key: '{{form.pipeline.parameters.api-key}}'
   criteria: |
     [
       {
