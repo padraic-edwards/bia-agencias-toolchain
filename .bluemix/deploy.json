@@ -17,7 +17,7 @@
         },
 
         "use-istio" : {
-            "type": "string"
+            "type": "boolean"
         },
         "vip" : {
             "type" : "string"
@@ -87,13 +87,18 @@
         },
         {
             "type": "table",
-            "columnCount": "2",
+            "columnCount": 3,
             "widths" : [
-                "75%",
+                "10%",
+                "65%",
                 "25%"
             ]
             ,
             "items" : [
+                {
+                    "type": "label",
+                    "title" : ""
+                },
                 {
                     "type" : "label",
                     "title" : "Regiões para deploy"
@@ -103,40 +108,58 @@
                     "title" : "Replicas"
                 },
                 {
+                    "type" : "label",
+                    "title" : "DEV"
+                },
+                {
                     "type" : "string",
-                    "title" : "DEV",
+                    "title" : "us-south",
                     "readonly" : false,
-                    "key" : "regions-to-deploy-dev"
+                    "key" : "regions-to-deploy-dev",
+                    "default" : "us-south"
                 },
                 {
                     "type" : "string",
                     "title" : "",
                     "readonly" : false,
-                    "key" : "replicas-dev"
+                    "key" : "replicas-dev",
+                    "default" : "1"
+                },
+                {
+                    "type" : "label",
+                    "title" : "HMG"
                 },
                 {
                     "type" : "string",
-                    "title" : "HMG",
+                    "title" : "us-south",
                     "readonly" : false,
-                    "key" : "regions-to-deploy-hom"
-                },
-                {
-                    "type" : "string",
-                    "title" : "",
-                    "readonly" : false,
-                    "key" : "replicas-hom"
-                },
-                {
-                    "type" : "string",
-                    "title" : "PROD",
-                    "readonly" : false,
-                    "key" : "regions-to-deploy-prod"
+                    "key" : "regions-to-deploy-hom",
+                    "default" : "us-south"
                 },
                 {
                     "type" : "string",
                     "title" : "",
                     "readonly" : false,
-                    "key" : "replicas-prod"
+                    "key" : "replicas-hom",
+                    "default" : "3"
+                },
+                {
+                    "type" : "label",
+                    "title" : "PROD"
+                },
+                {
+                    "type" : "string",
+                    "title" : "us-south",
+                    "readonly" : false,
+                    "key" : "regions-to-deploy-prod",
+                    "default" : "us-south"
+                },
+                {
+                    "type" : "string",
+                    "title" : "",
+                    "readonly" : false,
+                    "key" : "replicas-prod",
+                    "default" : "3"
                 }
             ]
         }
