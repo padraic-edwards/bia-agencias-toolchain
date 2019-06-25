@@ -4,13 +4,26 @@
     "description": "Insira informações do Github",
     "longDescription": "Insira informações do Github" ,
     "type": "object",
-    "properties": {
+    "properties": 
+        {
         "access-token": {
+            "type": "string"
+        },
+        "repo-url" : {
             "type": "string"
         }
     },
-    "required": ["access-token"],
+    "required": [
+        "access-token",
+        "repo-url"
+    ],
     "form": [
+        {
+            "type" :  "string",
+            "readonly": false,
+            "title" : "URL do repositorio",
+            "key" : "repo-url"
+        },
         {
             "type": "string",
             "readonly": false,

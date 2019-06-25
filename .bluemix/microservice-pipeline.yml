@@ -1,0 +1,476 @@
+---
+defaultBaseImageVersion: 'latest'
+properties:
+- name: MICROSERVICE_DIR
+  value: ${MICROSERVICE_NAME}
+  type: text
+- name: MICROSERVICE_NAME
+  value: qa-${MICROSERVICE_NAME}
+  type: text
+- name: API_KEY
+  type: secure
+  value: ${API_KEY}
+- name: buildProperties
+  value: build.properties
+  type: file
+- name: USE_ISTIO
+  value: ${USE_ISTIO}
+  type: text
+- name: GATEWAY_ADDRESS
+  value: ${GATEWAY_ADDRESS}
+  type: text
+stages:
+- name: PRE-BUILD
+  inputs:
+  - url: '{{form.hostedgit.parameters.repo-url}}'
+    type: git
+    branch: master
+    dir_name: null
+  triggers:
+  - type: git
+    events: '{"push":true,"pull_request":false,"pull_request_closed":false}'
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  properties:
+  - name: buildProperties
+    value: build.properties
+    type: file
+  jobs:
+  - name: BuildDeps
+    type: builder
+    curatedDockerImage: latest
+    artifact_dir: output
+    build_type: npm
+    script: |-
+      #!/bin/bash
+      # The default Node.js version is 0.10.40
+      # To use Node.js 0.10.48, uncomment the following line:
+      #export PATH=/opt/IBM/node-v0.10.48/bin:$PATH
+      # To use Node.js 0.12.7, uncomment the following line:
+      #export PATH=/opt/IBM/node-v0.12/bin:$PATH
+      # To use Node.js 4.4.5, uncomment the following line:
+      #export PATH=/opt/IBM/node-v4.4.5/bin:$PATH
+      # To use Node.js 6.7.0, uncomment the following line:
+      #export PATH=/opt/IBM/node-v6.7.0/bin:$PATH
+      npm install
+      npm run lint
+
+      mkdir -p $ARCHIVE_DIR
+      cp package.json $ARCHIVE_DIR
+      cp yarn.lock $ARCHIVE_DIR
+      cp -r $MICROSERVICE_DIR $ARCHIVE_DIR
+      cp -r _common $ARCHIVE_DIR
+
+      export MY_BUILD_NUMBER=$MICROSERVICE_NAME-v$BUILD_NUMBER
+      echo MY_BUILD_NUMBER=$MY_BUILD_NUMBER >> build.properties
+      echo GIT_COMMIT=$GIT_COMMIT >> build.properties
+      cp build.properties $ARCHIVE_DIR
+
+      ibmcloud plugin install -f doi
+      ibmcloud login --apikey $API_KEY --no-region
+      ibmcloud doi publishbuildrecord --logicalappname="$MICROSERVICE_NAME" --buildnumber="$MY_BUILD_NUMBER" --branch="$GIT_BRANCH" --repositoryurl="$GIT_URL" --commitid="$GIT_COMMIT" --status=pass
+- name: PRE-TEST
+  inputs:
+  - type: job
+    stage: PRE-BUILD
+    job: BuildDeps
+    dir_name: null
+  triggers:
+  - type: stage
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  properties:
+  - name: buildProperties
+    value: build.properties
+    type: file
+  jobs:
+  - name: UnitTest
+    type: tester
+    curatedDockerImage: latest
+    script: |+
+      #!/bin/bash
+      npm install
+
+      npm run test unit -- --collectCoverageFrom=$MICROSERVICE_DIR/**/*.js --collectCoverageFrom=\!**/server.js --collectCoverageFrom=\!**/_db/** --collectCoverageFrom=\!**/index.js || echo "Tests Failed!"
+
+      ibmcloud plugin install -f doi
+      ibmcloud login --apikey $API_KEY --no-region
+
+      ibmcloud doi publishtestrecord --logicalappname="$MICROSERVICE_NAME" --buildnumber="$MY_BUILD_NUMBER" --filelocation=junit.xml --type=unittest
+      ibmcloud doi publishtestrecord --logicalappname="$MICROSERVICE_NAME" --buildnumber="$MY_BUILD_NUMBER" --filelocation=coverage/cobertura-coverage.xml --type=code
+
+    enable_tests: true
+    test_file_pattern: junit.xml
+    coverage_type: istanbul
+    coverage_directory: coverage/lcov-report
+    coverage_file_pattern: coverage/coverage-final.json
+    test_type: simple
+  - name: LocalIntegrationTest
+    type: tester
+    curatedDockerImage: latest
+    script: "#!/bin/bash\n#Invoke tests here\nnpm install \n\nnpm run test integration\
+      \ || echo \"Tests Failed!\"\n\nibmcloud plugin install -f doi\nibmcloud login\
+      \ --apikey $API_KEY --no-region\n\nibmcloud doi publishtestrecord --logicalappname=\"\
+      $MICROSERVICE_NAME\" --buildnumber=\"$MY_BUILD_NUMBER\" --filelocation=junit.xml\
+      \ --type=inttest\nibmcloud doi publishtestrecord --logicalappname=\"$MICROSERVICE_NAME\"\
+      \ --buildnumber=\"$MY_BUILD_NUMBER\" --filelocation=coverage/cobertura-coverage.xml\
+      \ --type=intcode\n"
+    enable_tests: true
+    test_file_pattern: junit.xml
+    coverage_type: istanbul
+    coverage_directory: coverage/lcov-report
+    coverage_file_pattern: coverage/coverage-final.json
+    test_type: simple
+  - name: QualityGate
+    type: tester
+    curatedDockerImage: default
+    script: "#!/bin/bash\n# install the DevOps Insights plugin\nibmcloud plugin install\
+      \ -f doi\n\n# Login to IBMCloud if you are not already logged in.  Assumes that\
+      \ $API_KEY environment variable has been set as a secured property\nibmcloud\
+      \ login --apikey $API_KEY --no-region\n\n# The following line assumes that MY_APP_NAME\
+      \ and MY_BUILD_NUMBER environment variables have already been set.  POLICY is\
+      \ the name of the policy being evaluated.\nibmcloud doi evaluategate --logicalappname=\"\
+      $MICROSERVICE_NAME\" --buildnumber=\"$MY_BUILD_NUMBER\" --policy \"Unit Tests\
+      \ Policy\" > unitdecision.txt\n#ibmcloud doi evaluategate --logicalappname=\"\
+      $MICROSERVICE_NAME\" --buildnumber=\"$MY_BUILD_NUMBER\" --policy \"Integration\
+      \ Tests Policy\" > intdecision.txt\n\ncat unitdecision.txt\n#cat intdecision.txt\n\
+      \nUNITDECISION=$(grep true unitdecision.txt)\n#INTDECISION=$(grep true intdecision.txt)\n\
+      \nif [ -z \"$UNITDECISION\" ] \nthen\n    echo \"Gate failed!\" \n    exit 1\n\
+      fi\n\n#if [ -z \"$INTDECISION\" ] \n#then\n#    echo \"Gate failed!\" \n#  \
+      \  exit 1\n#fi\n\n"
+    test_type: simple
+  - name: TestCheckpoint
+    type: builder
+    curatedDockerImage: latest
+    artifact_dir: .
+    build_type: shell
+    script: echo "TESTS=OK" >> build.properties
+- name: BUILD
+  inputs:
+  - type: job
+    stage: PRE-TEST
+    job: TestCheckpoint
+    dir_name: null
+  triggers:
+  - type: stage
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  jobs:
+  - name: BuildImage
+    type: builder
+    curatedDockerImage: latest
+    artifact_dir: output
+    build_type: cr
+    script: "#!/bin/bash\necho -e \"Build environment variables:\"\necho \"REGISTRY_URL=${REGISTRY_URL}\"\
+      \necho \"REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}\"\necho \"IMAGE_NAME=${IMAGE_NAME}\"\
+      \necho \"BUILD_NUMBER=${MY_BUILD_NUMBER}\"\n\n# Learn more about the available\
+      \ environment variables at:\n# https://cloud.ibm.com/docs/services/ContinuousDelivery?topic=ContinuousDelivery-deliverypipeline_environment#deliverypipeline_environment\n\
+      \n# To review or change build options use:\n# bx cr build --help\n\necho -e\
+      \ \"Checking for Dockerfile at the microservices dir \"\nif [ -f $MICROSERVICE_DIR/Dockerfile\
+      \ ]; then \n   echo \"Dockerfile found\"\nelse\n    echo \"Dockerfile not found\"\
+      \n    exit 1\nfi\n\nfind . -print\n\necho -e \"Building container image\"\n\
+      set -x\nbx cr build -t $REGISTRY_URL/$REGISTRY_NAMESPACE/$IMAGE_NAME:$MY_BUILD_NUMBER\
+      \ -f $MICROSERVICE_DIR/Dockerfile .\nset +x\n\nmkdir ${ARCHIVE_DIR}\necho \"\
+      DOCKER_IMAGE_URL=$REGISTRY_URL/$REGISTRY_NAMESPACE/$IMAGE_NAME:$MY_BUILD_NUMBER\"\
+      \ >> build.properties\necho \"REGISTRY_NAMESPACE=$REGISTRY_NAMESPACE\" >> build.properties\n\
+      \ncp build.properties ${ARCHIVE_DIR}\ncp $MICROSERVICE_DIR/istio-*.yaml ${ARCHIVE_DIR}\n\
+      cp $MICROSERVICE_DIR/kube-deployment.yaml ${ARCHIVE_DIR}\n\n\n"
+    namespace: marcosbv
+    image_name: qa-manager-auth
+    target:
+      region_id: ibm:yp:us-south
+      api_key: ${API_KEY}
+- name: DEPLOY-DEV
+  inputs:
+  - type: job
+    stage: BUILD
+    job: BuildImage
+    dir_name: null
+  triggers:
+  - type: stage
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  properties:
+  - name: REGIONS_TO_DEPLOY
+    value: ${REGIONS_TO_DEPLOY_DEV}
+    type: text
+  - name: REPLICAS
+    value: ${REPLICAS_DEV}
+    type: text
+  jobs:
+  - name: VulnerabilityAdvisor
+    type: tester
+    curatedDockerImage: latest
+    script: "#!/bin/bash\necho -e \"Test environment variables:\"\necho \"REGISTRY_URL=${REGISTRY_URL}\"\
+      \necho \"REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}\"\necho \"IMAGE_NAME=${IMAGE_NAME}\"\
+      \necho \"IMAGE_TAG=${IMAGE_TAG}\"\n\n# default value for PIPELINE_IMAGE_URL\
+      \ -- uncomment and customize as needed\n# export PIPELINE_IMAGE_URL=\"$REGISTRY_URL/$REGISTRY_NAMESPACE/$IMAGE_NAME:$IMAGE_TAG\"\
+      \necho \"PIPELINE_IMAGE_URL=${PIPELINE_IMAGE_URL}\"\n\n# Learn more about the\
+      \ available environment variables at:\n# https://cloud.ibm.com/docs/services/ContinuousDelivery?topic=ContinuousDelivery-deliverypipeline_environment#deliverypipeline_environment\n\
+      \nfor iteration in {1..3}\ndo\n\t[[ $(bx cr va $PIPELINE_IMAGE_URL) == *No\\\
+      \ vulnerability\\ scan* ]] || break\n\techo -e \"A vulnerability report was\
+      \ not found for the specified image, either the image doesn't exist or the scan\
+      \ hasn't completed yet. Waiting for scan to complete..\"\n\tsleep 60\ndone\n\
+      \nset +e\nbx cr va $PIPELINE_IMAGE_URL\nset -e\n[[ $(bx cr va $PIPELINE_IMAGE_URL|\
+      \ grep \"NO ISSUES\") ]] || { echo \"ERROR: The vulnerability scan was not successful,\
+      \ check the output of the command and try again.\"; exit 1; }"
+    namespace: marcosbv
+    image_name: qa-manager-auth
+    image_tag: latest
+    target:
+      region_id: ibm:yp:us-south
+      api_key: ${API_KEY}
+    test_type: vulnerabilityadvisor
+  - name: DeployDev
+    type: deployer
+    curatedDockerImage: latest
+    deploy_type: kubernetes
+    target:
+      region_id: ibm:yp:us-south
+      api_key: ${API_KEY}
+      resource_group: ${RESOURCE_GROUP}
+      kubernetes_cluster: ${CLUSTER_NAME}_DEV
+    script: "#!/bin/bash\n#set -x\n\n# Use this script as a starting point to create\
+      \ your own deployment.yml\n\n# Make sure the cluster is running and get the\
+      \ ip_address\nip_addr=$(bx cs workers $PIPELINE_KUBERNETES_CLUSTER_NAME | grep\
+      \ normal | awk '{ print $2 }')\nif [ -z $ip_addr ]; then\n  echo \"$PIPELINE_KUBERNETES_CLUSTER_NAME\
+      \ not created or workers not ready\"\n  exit 1\nfi\n\n# Initialize script variables\n\
+      NAME=\"$MICROSERVICE_NAME\"\nIMAGE=\"$DOCKER_IMAGE_URL\"\nPORT=$(bx cr image-inspect\
+      \ $IMAGE --format \"{{ .ContainerConfig.ExposedPorts }}\" | sed -E 's/^[^0-9]*([0-9]+).*$/\\\
+      1/')\nif [ -z \"$PORT\" ]; then\n    PORT=5000\n    echo \"Port not found in\
+      \ Dockerfile, using $PORT\"\nfi\n\necho \"\"\necho \"Deploy environment variables:\"\
+      \necho \"NAME=$NAME\"\necho \"IMAGE=$IMAGE\"\necho \"PORT=$PORT\"\necho \"\"\
+      \n\nDEPLOYMENT_FILE=\"kube-deployment.yaml\"\necho \"Creating deployment file\
+      \ $DEPLOYMENT_FILE\"\n\n# Replace variables\nsed -i -e 's,${NAME},'\"$NAME\"\
+      ',g' $DEPLOYMENT_FILE\nsed -i -e 's,${IMAGE},'\"$IMAGE\"',g' $DEPLOYMENT_FILE\n\
+      sed -i -e 's,${REPLICAS},'\"$REPLICAS\"',g' $DEPLOYMENT_FILE\n\n\n# Show the\
+      \ file that is about to be executed\necho \"\"\necho \"DEPLOYING USING MANIFEST:\"\
+      \necho \"cat $DEPLOYMENT_FILE\"\ncat $DEPLOYMENT_FILE\necho \"\"\n\nif [ \"\
+      $USE_ISTIO\" = \"virtualservice\" -o \"$USE_ISTIO\" = \"gateway\" ]\nthen\n\
+      \    VIRTUALSERVICE_FILE=\"istio-$USE_ISTIO.yaml\"\n    echo \"Creating virtual\
+      \ service deployment file $VIRTUALSERVICE_FILE\"\n\n# Replace variables\n  \
+      \  sed -i -e 's,${NAME},'\"$NAME\"',g' $VIRTUALSERVICE_FILE\n    sed -i -e 's,${IMAGE},'\"\
+      $IMAGE\"',g' $VIRTUALSERVICE_FILE\n    sed -i -e 's,${REPLICAS},'\"$REPLICAS\"\
+      ',g' $VIRTUALSERVICE_FILE\n\n# Show the file that is about to be executed\n\
+      \    echo \"\"\n    echo \"DEPLOYING USING MANIFEST:\"\n    echo \"cat $VIRTUALSERVICE_FILE\"\
+      \n    cat $VIRTUALSERVICE_FILE\nfi\n\necho \"\"\nfor region in $REGIONS_TO_DEPLOY\n\
+      do\n     # Execute the file\n     echo \"======================================================\"\
+      \n     echo \"REGION TO DEPLOY: $region\n     ibmcloud target -r $region\n \
+      \    echo \"Getting Cluster Config Information for region $region\n     ibmcloud\
+      \ ks cluster-config --cluster $PIPELINE_KUBERNETES_CLUSTER_NAME --export > kubeconfig\n\
+      \     source kubeconfig\n\n     echo \"KUBERNETES COMMAND:\"\n     echo \"kubectl\
+      \ apply -f $DEPLOYMENT_FILE\"\n     kubectl apply -f $DEPLOYMENT_FILE\n    \
+      \ echo \"\"\n\n     echo \"\"\n     echo \"DEPLOYED SERVICE:\"\n     kubectl\
+      \ describe services $NAME\n     echo \"\"\n     echo \"DEPLOYED PODS:\"\n  \
+      \   kubectl describe pods --selector app=$NAME\n     echo \"\"\n\n     if [\
+      \ \"$USE_ISTIO\" = \"virtualservice\" -o \"$USE_ISTIO\" = \"gateway\" ]\n  \
+      \   then \n         echo \"KUBERNETES VIRTUAL SERVICE: \"\n         echo \"\
+      kubectl apply -f $VIRTUALSERVICE_FILE\"\n         kubectl apply -f $VIRTUALSERVICE_FILE\n\
+      \         echo \"\"\n\n    fi\n\n    # Testing APPLICATION\n    curl -i -k -X\
+      \ POST https://${GATEWAY_ADDRESS}/${MICROSERVICE_DIR}/status || echo \"Smoke\
+      \ test failed!\"\n     # Show the IP address and the PORT of the running app\n\
+      \     # port=$(kubectl get services | grep \"$NAME-service \" | sed 's/.*:\\\
+      ([0-9]*\\).*/\\1/g')\n     # echo \"RUNNING APPLICATION:\"\n     # echo \"PUBLIC_IP=$ip_addr\"\
+      \n     # echo \"PORT=$port\"\n     # echo \"\"\n     #echo \"$NAME running at:\
+      \ http://$ip_addr:$port\"\ndone\n\necho \"**************\"\necho \"Deploy done!\"\
+      \n"
+  - name: Checkpoint
+    type: builder
+    curatedDockerImage: latest
+    artifact_dir: output
+    build_type: shell
+    script: |-
+      #!/bin/bash
+      mkdir ${ARCHIVE_DIR}
+      cp build.properties ${ARCHIVE_DIR}
+      cp *.yaml ${ARCHIVE_DIR}
+- name: DEPLOY-HOM
+  inputs:
+  - type: job
+    stage: DEPLOY-DEV
+    job: Checkpoint
+    dir_name: null
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  properties:
+  - name: REGIONS_TO_DEPLOY
+    value: ${REGIONS_TO_DEPLOY_HOM}
+    type: text
+  - name: REPLICAS
+    value: ${REPLICAS_HOM}
+    type: text
+  jobs:
+  - name: DeployHom
+    type: deployer
+    curatedDockerImage: latest
+    deploy_type: kubernetes
+    target:
+      region_id: ibm:yp:us-south
+      api_key: ${API_KEY}
+      resource_group: ${RESOURCE_GROUP}
+      kubernetes_cluster: ${CLUSTER_NAME}_HOM
+    script: "#!/bin/bash\nset -x\n\n# Use this script as a starting point to create\
+      \ your own deployment.yml\n\n# Make sure the cluster is running and get the\
+      \ ip_address\nip_addr=$(bx cs workers $PIPELINE_KUBERNETES_CLUSTER_NAME | grep\
+      \ normal | awk '{ print $2 }')\nif [ -z $ip_addr ]; then\n  echo \"$PIPELINE_KUBERNETES_CLUSTER_NAME\
+      \ not created or workers not ready\"\n  exit 1\nfi\n\n# Initialize script variables\n\
+      NAME=\"$MICROSERVICE_NAME\"\nIMAGE=\"$DOCKER_IMAGE_URL\"\n\n# Set target to\
+      \ us-south to get information about image\nibmcloud target -r us-south\n\nPORT=$(bx\
+      \ cr image-inspect $IMAGE --format \"{{ .ContainerConfig.ExposedPorts }}\" |\
+      \ sed -E 's/^[^0-9]*([0-9]+).*$/\\1/')\nif [ -z \"$PORT\" ]; then\n    PORT=5000\n\
+      \    echo \"Port not found in Dockerfile, using $PORT\"\nfi\n\necho \"\"\necho\
+      \ \"Deploy environment variables:\"\necho \"NAME=$NAME\"\necho \"IMAGE=$IMAGE\"\
+      \necho \"PORT=$PORT\"\necho \"\"\n\nDEPLOYMENT_FILE=\"kube-deployment.yaml\"\
+      \necho \"Creating deployment file $DEPLOYMENT_FILE\"\n\n# Replace variables\n\
+      sed -i -e 's,${NAME},'\"$NAME\"',g' $DEPLOYMENT_FILE\nsed -i -e 's,${IMAGE},'\"\
+      $IMAGE\"',g' $DEPLOYMENT_FILE\nsed -i -e 's,${REPLICAS},'\"$REPLICAS\"',g' $DEPLOYMENT_FILE\n\
+      \n\n# Show the file that is about to be executed\necho \"\"\necho \"DEPLOYING\
+      \ USING MANIFEST:\"\necho \"cat $DEPLOYMENT_FILE\"\ncat $DEPLOYMENT_FILE\necho\
+      \ \"\"\n\nif [ \"$USE_ISTIO\" = \"virtualservice\" -o \"$USE_ISTIO\" = \"gateway\"\
+      \ ]\nthen\n    VIRTUALSERVICE_FILE=\"istio-$USE_ISTIO.yaml\"\n    echo \"Creating\
+      \ virtual service deployment file $VIRTUALSERVICE_FILE\"\n\n# Replace variables\n\
+      \    sed -i -e 's,${NAME},'\"$NAME\"',g' $VIRTUALSERVICE_FILE\n    sed -i -e\
+      \ 's,${IMAGE},'\"$IMAGE\"',g' $VIRTUALSERVICE_FILE\n    sed -i -e 's,${REPLICAS},'\"\
+      $REPLICAS\"',g' $VIRTUALSERVICE_FILE\n\n# Show the file that is about to be\
+      \ executed\n    echo \"\"\n    echo \"DEPLOYING USING MANIFEST:\"\n    echo\
+      \ \"cat $VIRTUALSERVICE_FILE\"\n    cat $VIRTUALSERVICE_FILE\nfi\n\necho \"\"\
+      \nfor region in $REGIONS_TO_DEPLOY\ndo\n     # Execute the file\n     echo \"\
+      ======================================================\"\n     echo \"REGION\
+      \ TO DEPLOY: $region\n     ibmcloud target -r $region\n     echo \"Getting Cluster\
+      \ Config Information for region $region\n     ibmcloud ks cluster-config --cluster\
+      \ $PIPELINE_KUBERNETES_CLUSTER_NAME --export > kubeconfig\n     source kubeconfig\n\
+      \n     echo \"KUBERNETES COMMAND:\"\n     echo \"kubectl apply -f $DEPLOYMENT_FILE\"\
+      \n     kubectl apply -f $DEPLOYMENT_FILE\n     echo \"\"\n\n     echo \"\"\n\
+      \     echo \"DEPLOYED SERVICE:\"\n     kubectl describe services $NAME\n   \
+      \  echo \"\"\n     echo \"DEPLOYED PODS:\"\n     kubectl describe pods --selector\
+      \ app=$NAME\n     echo \"\"\n\n     if [ \"$USE_ISTIO\" = \"virtualservice\"\
+      \ -o \"$USE_ISTIO\" = \"gateway\" ]\n     then \n         echo \"KUBERNETES\
+      \ VIRTUAL SERVICE: \"\n         echo \"kubectl apply -f $VIRTUALSERVICE_FILE\"\
+      \n         kubectl apply -f $VIRTUALSERVICE_FILE\n         echo \"\"\n\n   \
+      \ fi\n\n    # Testing APPLICATION\n    curl -i -k -X POST https://${GATEWAY_ADDRESS}/${MICROSERVICE_DIR}\
+      \ || echo \"Smoke test failed!\"\n     # Show the IP address and the PORT of\
+      \ the running app\n     # port=$(kubectl get services | grep \"$NAME-service\
+      \ \" | sed 's/.*:\\([0-9]*\\).*/\\1/g')\n     # echo \"RUNNING APPLICATION:\"\
+      \n     # echo \"PUBLIC_IP=$ip_addr\"\n     # echo \"PORT=$port\"\n     # echo\
+      \ \"\"\n     #echo \"$NAME running at: http://$ip_addr:$port\"\ndone\n\necho\
+      \ \"**************\"\necho \"Deploy done!\"\n"
+- name: PERF-TEST
+  triggers:
+  - type: stage
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  properties:
+  - name: BENCHMARK_URL
+    value: ${BENCHMARK_URL}
+    type: text
+  - name: WORKLOADS
+    value: ${PERF_TEST_WORKLOADS}
+    type: text
+  - name: CONCURRENT_USERS_RATIO
+    value: ${PERF_CONCURRENT_USERS_RATIO}
+    type: text
+  - name: PAYLOAD
+    value: '${PERF_PAYLOAD}'
+    type: text
+  - name: METHOD
+    value: ${PERF_PAYLOAD}
+    type: text
+  - name: BENCHMARK_API_KEY
+    type: ${PERF_API_KEY}
+  jobs:
+  - name: PerformanceTest
+    type: tester
+    curatedDockerImage: default
+    script: |-
+      #!/bin/sh
+
+      echo ${PAYLOAD} > data.txt
+      for workload in ${WORKLOADS}
+      do
+          ratio=$(( workload / CONCURRENT_USERS_RATIO ))
+          echo "****************************"
+          echo "Performing benchmarking using WORKLOAD=${workload} and CONCURRENT_USERS=${ratio}"
+          if [ "${METHOD}" = "POST" ]
+          then
+              ab -n ${workload} -c ${ratio} -p data.txt -T 'application/json' -m POST "${BENCHMARK_URL}?apikey=${BENCHMARK_API_KEY}"
+          fi
+
+           if [ "${METHOD}" = "GET" ]
+          then
+              ab -n ${workload} -c ${ratio} -T 'application/json' -m GET "${BENCHMARK_URL}?apikey=${BENCHMARK_API_KEY}"
+          fi
+      done
+
+      echo "****************************"
+      echo "End of benchmark test!"
+    test_type: customimage
+    docker_image: marcosbv/ab-machine:1.0
+- name: DEPLOY-PROD
+  inputs:
+  - type: job
+    stage: DEPLOY-DEV
+    job: Checkpoint
+    dir_name: null
+  permission:
+    execute: TOOLCHAIN_ADMINS
+  jobs:
+  - name: DeployProd
+    type: deployer
+    curatedDockerImage: latest
+    deploy_type: kubernetes
+    target:
+      region_id: ibm:yp:us-south
+      api_key: ${API_KEY}
+      resource_group: ${RESOURCE_GROUP}
+      kubernetes_cluster: ${CLUSTER_NAME}_PROD
+    script: "#!/bin/bash\nset -x\n\n# Use this script as a starting point to create\
+      \ your own deployment.yml\n\n# Make sure the cluster is running and get the\
+      \ ip_address\nip_addr=$(bx cs workers $PIPELINE_KUBERNETES_CLUSTER_NAME | grep\
+      \ normal | awk '{ print $2 }')\nif [ -z $ip_addr ]; then\n  echo \"$PIPELINE_KUBERNETES_CLUSTER_NAME\
+      \ not created or workers not ready\"\n  exit 1\nfi\n\n# Initialize script variables\n\
+      NAME=\"$MICROSERVICE_NAME\"\nIMAGE=\"$DOCKER_IMAGE_URL\"\n\n# Set target to\
+      \ us-south to get information about image\nibmcloud target -r us-south\n\nPORT=$(bx\
+      \ cr image-inspect $IMAGE --format \"{{ .ContainerConfig.ExposedPorts }}\" |\
+      \ sed -E 's/^[^0-9]*([0-9]+).*$/\\1/')\nif [ -z \"$PORT\" ]; then\n    PORT=5000\n\
+      \    echo \"Port not found in Dockerfile, using $PORT\"\nfi\n\necho \"\"\necho\
+      \ \"Deploy environment variables:\"\necho \"NAME=$NAME\"\necho \"IMAGE=$IMAGE\"\
+      \necho \"PORT=$PORT\"\necho \"\"\n\nDEPLOYMENT_FILE=\"kube-deployment.yaml\"\
+      \necho \"Creating deployment file $DEPLOYMENT_FILE\"\n\n# Replace variables\n\
+      sed -i -e 's,${NAME},'\"$NAME\"',g' $DEPLOYMENT_FILE\nsed -i -e 's,${IMAGE},'\"\
+      $IMAGE\"',g' $DEPLOYMENT_FILE\nsed -i -e 's,${REPLICAS},'\"$REPLICAS\"',g' $DEPLOYMENT_FILE\n\
+      \n\n# Show the file that is about to be executed\necho \"\"\necho \"DEPLOYING\
+      \ USING MANIFEST:\"\necho \"cat $DEPLOYMENT_FILE\"\ncat $DEPLOYMENT_FILE\necho\
+      \ \"\"\n\nif [ \"$USE_ISTIO\" = \"virtualservice\" -o \"$USE_ISTIO\" = \"gateway\"\
+      \ ]\nthen\n    VIRTUALSERVICE_FILE=\"istio-$USE_ISTIO.yaml\"\n    echo \"Creating\
+      \ virtual service deployment file $VIRTUALSERVICE_FILE\"\n\n# Replace variables\n\
+      \    sed -i -e 's,${NAME},'\"$NAME\"',g' $VIRTUALSERVICE_FILE\n    sed -i -e\
+      \ 's,${IMAGE},'\"$IMAGE\"',g' $VIRTUALSERVICE_FILE\n    sed -i -e 's,${REPLICAS},'\"\
+      $REPLICAS\"',g' $VIRTUALSERVICE_FILE\n\n# Show the file that is about to be\
+      \ executed\n    echo \"\"\n    echo \"DEPLOYING USING MANIFEST:\"\n    echo\
+      \ \"cat $VIRTUALSERVICE_FILE\"\n    cat $VIRTUALSERVICE_FILE\nfi\n\necho \"\"\
+      \nfor region in $REGIONS_TO_DEPLOY\ndo\n     # Execute the file\n     echo \"\
+      ======================================================\"\n     echo \"REGION\
+      \ TO DEPLOY: $region\n     ibmcloud target -r $region\n     echo \"Getting Cluster\
+      \ Config Information for region $region\n     ibmcloud ks cluster-config --cluster\
+      \ $PIPELINE_KUBERNETES_CLUSTER_NAME --export > kubeconfig\n     source kubeconfig\n\
+      \n     echo \"KUBERNETES COMMAND:\"\n     echo \"kubectl apply -f $DEPLOYMENT_FILE\"\
+      \n     kubectl apply -f $DEPLOYMENT_FILE\n     echo \"\"\n\n     echo \"\"\n\
+      \     echo \"DEPLOYED SERVICE:\"\n     kubectl describe services $NAME\n   \
+      \  echo \"\"\n     echo \"DEPLOYED PODS:\"\n     kubectl describe pods --selector\
+      \ app=$NAME\n     echo \"\"\n\n     if [ \"$USE_ISTIO\" = \"virtualservice\"\
+      \ -o \"$USE_ISTIO\" = \"gateway\" ]\n     then \n         echo \"KUBERNETES\
+      \ VIRTUAL SERVICE: \"\n         echo \"kubectl apply -f $VIRTUALSERVICE_FILE\"\
+      \n         kubectl apply -f $VIRTUALSERVICE_FILE\n         echo \"\"\n\n   \
+      \ fi\n\n    # Testing APPLICATION\n    curl -i -k -X POST https://${GATEWAY_ADDRESS}/${MICROSERVICE_DIR}\
+      \ || echo \"Smoke test failed!\"\n     # Show the IP address and the PORT of\
+      \ the running app\n     # port=$(kubectl get services | grep \"$NAME-service\
+      \ \" | sed 's/.*:\\([0-9]*\\).*/\\1/g')\n     # echo \"RUNNING APPLICATION:\"\
+      \n     # echo \"PUBLIC_IP=$ip_addr\"\n     # echo \"PORT=$port\"\n     # echo\
+      \ \"\"\n     #echo \"$NAME running at: http://$ip_addr:$port\"\ndone\n\necho\
+      \ \"**************\"\necho \"Deploy done!\"\n"
+
+hooks:
+- enabled: true
+  label: null
+  ssl_enabled: false
+  url: http://lms-api/v1/messaging/webhook/publish

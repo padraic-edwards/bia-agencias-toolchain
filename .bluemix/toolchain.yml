@@ -4,7 +4,9 @@ template:
   name: "Deployment BIA Agencias"
   description: "Implementa pipeline de DevOps da BIA Agencias"
   required:
-    - orchestrator-repo
+    - qa-repo
+    - qa-dra
+    - qa-auth-build
   info:
     git url: >-
       [https://github.com/marcosbv/bia-agencias-toolchain](https://github.com/marcosbv/bia-agencias-toolchain)
@@ -13,20 +15,49 @@ template:
 toolchain:
   name: 'bia-agencias-toolchain-{{timestamp}}'
 services:
-  orchestrator-repo:
-    service_id: githubconsolidated
+  qa-repo:
+    service_id: hostedgit
     parameters:
       repo_name: 'QA Manager V2 repo'
       title:     'QA Manager V2 repo'
-      repo_url:  'https://github.ibm.com/watson-delivery-la/qa-manager-2.git'
-      root_url:  'https://github.ibm.com'
+      repo_url:  '{{form.hostedgit.parameters.repo-url}}'
       type: link
       private_repo: true
       has_issues: false
       enable_traceability: true
-      access_token: '{{form.githubconsolidated.parameters.access-token}}'
+      access_token: '{{form.hostedgit.parameters.access-token}}'
+  qa-dra:
+    service_id: draservicebroker
+    $ref: dra.yml
+  qa-auth-build:
+    service_id: pipeline
+    name: qa-auth-pipeline
+  configuration:
+    content:
+      $text: microservice-pipeline.yml
+    env:
+       MICROSERVICE_NAME: auth
+       API_KEY: '{{form.pipeline.parameters.api-key}}'
+       CLUSTER_NAME: '{{form.pipeline.parameters.cluster-name}}'
+       RESOURCE_GROUP: '{{form.pipeline.parameters.resource-group}}'
+       USE_ISTIO: 'no'
+       GATEWAY_ADDRESS: '{{form.pipeline.parameters.vip}}'
+       REGIONS_TO_DEPLOY_DEV: '{{form.pipeline.parameters.regions-to-deploy-dev}}'
+       REPLICAS_DEV: '{{form.pipeline.parameters.replicas-dev}}'
+       REGIONS_TO_DEPLOY_HOM: '{{form.pipeline.parameters.regions-to-deploy-hom}}'
+       REPLICAS_HOM: '{{form.pipeline.parameters.replicas-hom}}'
+       REGIONS_TO_DEPLOY_PROD: '{{form.pipeline.parameters.regions-to-deploy-prod}}'
+       REPLICAS_PROD: '{{form.pipeline.parameters.replicas-prod}}'
+       BENCHMARK_URL: 'https://{{form.pipeline.parameters.vip}}:443/auth/users'
+       PERF_TEST_WORKLOADS: '100 500 1000'
+       PERF_CONCURRENT_USERS_RATIO: '10'
+       PERF_PAYLOAD: '{}'
+       PERF_API_KEY: 
 form:
-  githubconsolidated:
+  hostedgit:
     schema:
       $ref: github.json
+  pipeline:
+    schema:
+      $ref: deploy.json
 

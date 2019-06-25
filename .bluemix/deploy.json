@@ -1,0 +1,145 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Informações sobre Microserviços",
+    "description": "Insira informações sobre Microserviços",
+    "longDescription": "Insira informações sobre Microserviços" ,
+    "type": "object",
+    "properties": 
+        {
+        "api-key": {
+            "type": "string"
+        },
+        "cluster-name": {
+            "type" : "string"
+        },
+        "resource-group" : {
+            "type" : "string"
+        },
+
+        "use-istio" : {
+            "type": "string"
+        },
+        "vip" : {
+            "type" : "string"
+        },
+        "regions-to-deploy-dev" : {
+            "type" : "string"
+        },
+        "replicas-dev" : {
+            "type" : "string"
+        },
+        "regions-to-deploy-hom" : {
+            "type" : "string"
+        },
+        "replicas-hom" : {
+            "type" : "string"
+        }, 
+        "regions-to-deploy-prod" : {
+            "type" : "string"
+        },
+        "replicas-prod" : {
+            "type" : "string"
+        }
+    },
+    "required": [
+        "api-key",
+        "cluster-name",
+        "resource-group",
+        "use-istio",
+        "regions-to-deploy-dev",
+        "replicas-dev",
+        "regions-to-deploy-hom",
+        "replicas-hom",
+        "regions-to-deploy-prod",
+        "replicas-prod"
+    ],
+    "form": [
+        {
+            "type" :  "string",
+            "readonly": false,
+            "title" : "Nome do Cluster",
+            "key" : "cluster-name"
+        },
+        {
+            "type": "password",
+            "readonly": false,
+            "title": "API Key Para Pipeline",
+            "key": "api-key"
+        },
+        {
+            "type": "string",
+            "readonly" : false,
+            "title" : "Grupo de Recursos",
+            "key": "resource-group"
+        },
+        {
+            "type": "boolean",
+            "readonly" : false,
+            "title" : "Usa Istio?",
+            "key": "use-istio",
+            "default" : true
+        },
+        {
+            "type": "string",
+            "readonly" : false,
+            "title" : "Gateway (IP ou Hostname)",
+            "key": "vip"
+        },
+        {
+            "type": "table",
+            "columnCount": "2",
+            "widths" : [
+                "75%",
+                "25%"
+            ]
+            ,
+            "items" : [
+                {
+                    "type" : "label",
+                    "title" : "Regiões para deploy"
+                },
+                {
+                    "type" : "label",
+                    "title" : "Replicas"
+                },
+                {
+                    "type" : "string",
+                    "title" : "DEV",
+                    "readonly" : false,
+                    "key" : "regions-to-deploy-dev"
+                },
+                {
+                    "type" : "string",
+                    "title" : "",
+                    "readonly" : false,
+                    "key" : "replicas-dev"
+                },
+                {
+                    "type" : "string",
+                    "title" : "HMG",
+                    "readonly" : false,
+                    "key" : "regions-to-deploy-hom"
+                },
+                {
+                    "type" : "string",
+                    "title" : "",
+                    "readonly" : false,
+                    "key" : "replicas-hom"
+                },
+                {
+                    "type" : "string",
+                    "title" : "PROD",
+                    "readonly" : false,
+                    "key" : "regions-to-deploy-prod"
+                },
+                {
+                    "type" : "string",
+                    "title" : "",
+                    "readonly" : false,
+                    "key" : "replicas-prod"
+                }
+            ]
+        }
+       
+    ] 
+}
