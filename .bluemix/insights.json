@@ -1,0 +1,11 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Informações sobre DevOps Insights",
+    "description": "Insira informações do DevOps Insights",
+    "longDescription": "Insira informações do DevOps Insights" ,
+    "type": "object",
+    "properties": 
+        {},
+    "required": [],
+    "form": [] 
+}

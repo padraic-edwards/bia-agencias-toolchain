@@ -62,5 +62,6 @@ form:
     schema:
       $ref: deploy.json
   draservicebroker:
-    
+    schema:
+      $ref: insights.json
 
