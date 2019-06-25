@@ -1,11 +1,29 @@
 {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "title": "Informações sobre DevOps Insights",
-    "description": "Insira informações do DevOps Insights",
-    "longDescription": "Insira informações do DevOps Insights" ,
     "type": "object",
-    "properties": 
-        {},
-    "required": [],
-    "form": [] 
+    "properties": {
+        "iam-api-key": {
+            "description": {
+                "$ref": "#/messages/deploy.apiKeyDescription"
+            },
+            "type": "string"
+        }
+    },
+    "required": [
+        "iam-api-key"
+    ],
+    "form": [
+        {
+            "type": "validator",
+            "url": "/devops/setup/bm-helper/helper.html"
+        },
+        {
+	        "type": "password",
+	        "readonly": false,
+	        "title": {
+                "$ref": "#/messages/deploy.apiKeyTitle"
+            },
+	        "key": "iam-api-key"
+        }
+    ]
 }
