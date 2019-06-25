@@ -7,6 +7,7 @@ template:
     - qa-repo
     - qa-dra
     - qa-auth-build
+    - dra
   info:
     git url: >-
       [https://github.com/marcosbv/bia-agencias-toolchain](https://github.com/marcosbv/bia-agencias-toolchain)
@@ -23,7 +24,7 @@ services:
       repo_url:  '{{form.hostedgit.parameters.repo-url}}'
       type: link
       private_repo: true
-      has_issues: false
+      has_issues: true
       enable_traceability: true
       access_token: '{{form.hostedgit.parameters.access-token}}'
   dra:
