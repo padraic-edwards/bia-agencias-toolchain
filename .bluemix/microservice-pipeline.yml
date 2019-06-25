@@ -17,7 +17,7 @@ properties:
   value: ${USE_ISTIO}
   type: text
 - name: GATEWAY_ADDRESS
-  value: ${GATEWAY_ADDRESS}
+  value: '${GATEWAY_ADDRESS}'
   type: text
 stages:
 - name: PRE-BUILD
@@ -25,7 +25,6 @@ stages:
   - service: ${QA_REPO}
     type: git
     branch: master
-    dir_name: null
   triggers:
   - type: git
     events: '{"push":true,"pull_request":false,"pull_request_closed":false}'
