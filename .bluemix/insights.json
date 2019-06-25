@@ -3,9 +3,7 @@
     "type": "object",
     "properties": {
         "iam-api-key": {
-            "description": {
-                "$ref": "#/messages/deploy.apiKeyDescription"
-            },
+            "description": "API Key para integração do DevOps Insights com as outras ferramentas da conta",
             "type": "string"
         }
     },
@@ -20,9 +18,7 @@
         {
 	        "type": "password",
 	        "readonly": false,
-	        "title": {
-                "$ref": "#/messages/deploy.apiKeyTitle"
-            },
+	        "title": "API Key",
 	        "key": "iam-api-key"
         }
     ]
