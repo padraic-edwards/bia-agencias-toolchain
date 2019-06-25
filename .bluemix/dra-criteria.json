@@ -1,0 +1,49 @@
+[
+    {
+      "name":"Unit Tests Policy",
+      "description": "Unit Tests Policy",
+      "rules":[
+        {
+          "name": "Unit Test",
+          "description": "All Tests Must Pass",
+          "format":"xunit",
+          "stage":"unittest",
+          "percentPass":100,
+          "regressionCheck":true,
+          "criticalTests":[
+          ]
+        },
+        {
+          "name": "Code Coverage",
+          "description": "Unit Test Coverage greater than 95%",
+          "format":"istanbul",
+          "stage":"code",
+          "codeCoverage":95,
+          "regressionCheck":true
+        }
+      ]
+    },
+    {
+      "name":"Integration Tests Policy",
+      "description": "Integration Tests Policy",
+      "rules":[
+        {
+          "name": "Integration Test",
+          "description": "All Integration Test must pass",
+          "format":"xunit",
+          "stage":"inttest",
+          "percentPass":100,
+          "regressionCheck":true,
+          "criticalTests":[
+          ]
+        },
+        {
+          "name": "Integration Code Coverage",
+          "description": "Integration Test Coverage Greater Than 85%",
+          "format":"istanbul",
+          "stage":"code",
+          "codeCoverage":85
+        }
+      ]
+    }
+  ]
