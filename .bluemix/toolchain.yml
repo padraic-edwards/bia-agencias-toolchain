@@ -5,7 +5,6 @@ template:
   description: "Implementa pipeline de DevOps da BIA Agencias"
   required:
     - qa-repo
-    - qa-dra
     - qa-auth-build
   info:
     git url: >-
