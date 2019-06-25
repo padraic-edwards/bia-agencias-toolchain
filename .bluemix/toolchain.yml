@@ -7,7 +7,6 @@ template:
     - qa-repo
     - qa-dra
     - qa-auth-build
-    - dra
   info:
     git url: >-
       [https://github.com/marcosbv/bia-agencias-toolchain](https://github.com/marcosbv/bia-agencias-toolchain)
@@ -57,9 +56,7 @@ services:
             PERF_PAYLOAD: '{}'
             PERF_API_KEY: ''
          execute: false
-  dra:
-    service_id: draservicebroker
-    $ref: dra.yml
+
 form:
   hostedgit:
     schema:
@@ -67,6 +64,4 @@ form:
   pipeline:
     schema:
       $ref: deploy.json
-  draservicebroker:
-    schema:
-      $ref: insights.json
+ 
