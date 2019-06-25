@@ -26,7 +26,7 @@ services:
       has_issues: false
       enable_traceability: true
       access_token: '{{form.hostedgit.parameters.access-token}}'
-  qa-dra:
+  dra:
     service_id: draservicebroker
     $ref: dra.yml
   qa-auth-build:
@@ -61,7 +61,3 @@ form:
   pipeline:
     schema:
       $ref: deploy.json
-  draservicebroker:
-    schema:
-      $ref: insights.json
-
