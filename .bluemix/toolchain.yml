@@ -34,6 +34,7 @@ services:
     service_id: pipeline
     parameters:
       name: qa-auth-pipeline
+      ui-pipeline: true
       configuration:
          content:
            $text: microservice-pipeline.yml
@@ -42,7 +43,7 @@ services:
             API_KEY: '{{form.pipeline.parameters.api-key}}'
             CLUSTER_NAME: '{{form.pipeline.parameters.cluster-name}}'
             RESOURCE_GROUP: '{{form.pipeline.parameters.resource-group}}'
-            USE_ISTIO: 'no'
+            USE_ISTIO: '{{form.pipeline.parameters.use-istio}}'
             GATEWAY_ADDRESS: '{{form.pipeline.parameters.vip}}'
             REGIONS_TO_DEPLOY_DEV: '{{form.pipeline.parameters.regions-to-deploy-dev}}'
             REPLICAS_DEV: '{{form.pipeline.parameters.replicas-dev}}'
@@ -50,11 +51,12 @@ services:
             REPLICAS_HOM: '{{form.pipeline.parameters.replicas-hom}}'
             REGIONS_TO_DEPLOY_PROD: '{{form.pipeline.parameters.regions-to-deploy-prod}}'
             REPLICAS_PROD: '{{form.pipeline.parameters.replicas-prod}}'
-            BENCHMARK_URL: 'https://{{form.pipeline.parameters.vip}}:443/auth/users'
+            BENCHMARK_URL: 'https://${GATEWAY_ADDRESS}:443/auth/users'
             PERF_TEST_WORKLOADS: '100 500 1000'
             PERF_CONCURRENT_USERS_RATIO: '10'
             PERF_PAYLOAD: '{}'
-            PERF_API_KEY: 
+            PERF_API_KEY: ''
+         execute: false
 form:
   hostedgit:
     schema:

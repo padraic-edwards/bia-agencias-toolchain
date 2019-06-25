@@ -468,9 +468,3 @@ stages:
       \n     # echo \"PUBLIC_IP=$ip_addr\"\n     # echo \"PORT=$port\"\n     # echo\
       \ \"\"\n     #echo \"$NAME running at: http://$ip_addr:$port\"\ndone\n\necho\
       \ \"**************\"\necho \"Deploy done!\"\n"
-
-hooks:
-- enabled: true
-  label: null
-  ssl_enabled: false
-  url: http://lms-api/v1/messaging/webhook/publish
