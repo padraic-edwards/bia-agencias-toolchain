@@ -34,7 +34,7 @@ services:
         - qa-repo
       configuration:
          content:
-           $text: microservice-pipeline-test.yml
+           $text: microservice-pipeline.yml
          env:
             QA_REPO: qa-repo
             MICROSERVICE_NAME: auth
