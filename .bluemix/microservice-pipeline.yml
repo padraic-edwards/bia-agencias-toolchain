@@ -1,5 +1,4 @@
 ---
-defaultBaseImageVersion: 'latest'
 properties:
 - name: MICROSERVICE_DIR
   value: ${MICROSERVICE_NAME}
