@@ -374,7 +374,7 @@ stages:
     value: ${PERF_PAYLOAD}
     type: text
   - name: BENCHMARK_API_KEY
-    value: ${PERF_API_KEY}
+    value: '${PERF_API_KEY}'
     type: text
   jobs:
   - name: PerformanceTest
