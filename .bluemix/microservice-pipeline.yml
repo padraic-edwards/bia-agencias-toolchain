@@ -375,7 +375,7 @@ stages:
     type: text
   - name: BENCHMARK_API_KEY
     value: ${PERF_API_KEY}
-    type: secure
+    type: text
   jobs:
   - name: PerformanceTest
     type: tester
