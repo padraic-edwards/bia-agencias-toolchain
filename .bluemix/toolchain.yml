@@ -53,7 +53,7 @@ services:
             PERF_TEST_WORKLOADS: '100 500 1000'
             PERF_CONCURRENT_USERS_RATIO: '10'
             PERF_PAYLOAD: '{}'
-            PERF_API_KEY: ''
+            PERF_API_KEY: '{{form.pipeline.parameters.api-key}}'
          execute: false
 
 form:
